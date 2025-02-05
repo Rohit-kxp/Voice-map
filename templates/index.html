@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Voice Enabled Map</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.css" type="text/css">
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: #f0f0f0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: background-color 0.3s ease-in-out;
+            animation: fadeIn 1s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        #map {
+            height: 600px;
+            width: 100%;
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease-in-out;
+            animation: mapFadeIn 1s ease-in-out;
+        }
+        @keyframes mapFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        .container {
+            margin-top: 50px;
+        }
+        h1 {
+            color: #4e73df;
+            font-weight: 600;
+            text-align: center;
+        }
+        .btn-custom {
+            background-color: #4e73df;
+            color: white;
+            font-size: 18px;
+            border-radius: 8px;
+            padding: 12px 24px;
+            transition: background-color 0.3s ease;
+        }
+        .btn-custom:hover {
+            background-color: #2e59d9;
+        }
+        .voice-input {
+            font-size: 18px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 8px 15px;
+            width: 80%;
+            margin: 10px auto;
+            display: block;
+            transition: border-color 0.3s;
+        }
+        .voice-input:focus {
+            border-color: #4e73df;
+        }
+        .dark-mode {
+            background-color: #2E3B4E;
+            color: white;
+        }
+        .dark-mode .btn-custom {
+            background-color: #28a745;
+        }
+        .dark-mode .btn-custom:hover {
+            background-color: #218838;
+        }
+        .dark-mode-toggle {
+            cursor: pointer;
+            padding: 12px 20px;
+            background-color: #2E3B4E;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            transition: background-color 0.3s ease;
+        }
+
+        .dark-mode-toggle:hover {
+            background-color: #3B4F6E;
+        }
+        .zoom-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #4e73df;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            z-index: 10;
+        }
+        .zoom-btn:hover {
+            background-color: #2e59d9;
+        }
+    </style>
+</head>
+<body>
+    <button class="dark-mode-toggle" onclick="toggleDarkMode()">Toggle Dark Mode</button>
+    <div class="container">
+        <h1>Voice Enabled Interactive Map</h1>
+        <div id="map"></div>
+        <div class="text-center mt-4">
+            <button class="btn btn-custom" onclick="startVoiceRecognition()">Start Voice Command</button>
+        </div>
+        <input type="text" class="voice-input" id="voiceInput" placeholder="Say a location..." disabled>
+        <div id="loading" class="alert alert-info alert-custom" role="alert">
+            <strong>Processing...</strong> Please wait while we process your command.
+        </div>
+        <div id="error" class="alert alert-danger alert-custom" role="alert">
+            <strong>Error:</strong> Failed to process the voice command.
+        </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
+    <script>
+        var map;
+        var view;
+        function initMap() {
+            view = new ol.View({
+                center: ol.proj.fromLonLat([78.9629, 20.5937]), // Center on India
+                zoom: 5
+            });
+            map = new ol.Map({
+                target: 'map',
+                layers: [
+                    new ol.layer.Tile({
+                        source: new ol.source.OSM()
+                    })
+                ],
+                view: view
+            });
+        }
+        window.onload = initMap;
+        function startVoiceRecognition() {
+            var recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+            recognition.start();
+            recognition.onstart = function() {
+                console.log('Voice recognition started');
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('error').style.display = 'none';
+            };
+            recognition.onresult = function(event) {
+                var command = event.results[0][0].transcript.toLowerCase();
+                document.getElementById('voiceInput').value = command;
+                console.log('Voice Command: ', command);
+                if (command.includes("go to")) {
+                    var location = command.split("go to ")[1];
+                    var geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${location}`;
+                    fetch(geocodeUrl)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data && data.length > 0) {
+                                var lonLat = ol.proj.fromLonLat([parseFloat(data[0].lon), parseFloat(data[0].lat)]);
+                                view.setCenter(lonLat);
+                                view.setZoom(10);
+                            } else {
+                                alert("Location not found.");
+                            }
+                        })
+                        .catch(error => {
+                            console.error("Error fetching geocoding data:", error);
+                            alert("Failed to find the location.");
+                        });
+                } else if (command.includes("zoom in")) {
+                    zoomIn();
+                } else if (command.includes("zoom out")) {
+                    zoomOut();
+                } else {
+                    alert("Command not recognized.");
+                }
+                document.getElementById('loading').style.display = 'none';
+            };
+            recognition.onerror = function(event) {
+                console.log('Error occurred in recognition: ' + event.error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            };
+        }
+        function zoomIn() {
+            var currentZoom = view.getZoom();
+            view.setZoom(currentZoom + 1);
+        }
+        function zoomOut() {
+            var currentZoom = view.getZoom();
+            view.setZoom(currentZoom - 1);
+        }
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark-mode');
+            var mapLayer = map.getLayers().item(0);
+            var currentSource = mapLayer.getSource();
+            if (document.body.classList.contains('dark-mode')) {
+                mapLayer.setSource(new ol.source.OSM({
+                    url: 'https://{a-c}.tile.openstreetmap.org/{z}/{x}/{y}.png'
+                }));
+                document.getElementById('map').style.filter = 'invert(1)'; 
+            } else {
+                mapLayer.setSource(new ol.source.OSM());
+                document.getElementById('map').style.filter = 'invert(0)'; 
+            }
+        }
+    </script>
+</body>
+</html>
